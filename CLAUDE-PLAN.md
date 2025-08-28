@@ -4,7 +4,7 @@
 
 We are creating a GitHub Action that will diff Kubernetes manifests between a
 base ref (default: main branch) and a head ref (default: current commit). The
-action will support three tools: helm, kustomize, and plain yaml.
+action will support three tools: helm, kustomize, and plain YAML.
 
 ## Architecture
 
@@ -111,7 +111,7 @@ action will support three tools: helm, kustomize, and plain yaml.
 - Test each tool type with sample manifests
 - Verify diff output format and content
 
-#### 4.3 E2E Tests (.github/workflows/e2e-test.yml)
+#### 4.3 End-to-End Tests (.github/workflows/e2e-test.yml)
 
 - Test action in real GitHub Actions environment
 - Use test fixtures from tests/fixtures/
@@ -262,16 +262,16 @@ async function generateManifests(tool, command, workingDir) {
 ## Success Criteria
 
 1. Action successfully installs required tools when missing
-2. Generates manifests correctly for helm and yaml tool types (kustomize later)
+2. Generates manifests correctly for helm and YAML tool types (kustomize later)
 3. Produces meaningful YAML diffs between base and head refs
 4. Captures stderr and sets error flags for debugging failed commands
-5. Passes all unit, integration, and e2e tests for helm and yaml
+5. Passes all unit, integration, and end-to-end tests for helm and YAML
 6. Works with real-world Kubernetes manifests and helm charts
 7. Provides clear error messages and debugging information
 8. Follows GitHub Actions best practices for inputs/outputs
 
 ## Initial Implementation Scope
 
-- **Phase 1**: Implement helm and yaml tool support with e2e tests
+- **Phase 1**: Implement helm and YAML tool support with end-to-end tests
 - **Phase 2**: Add kustomize support later
 - Focus on robust error handling and debugging capabilities
