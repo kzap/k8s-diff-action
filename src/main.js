@@ -57,6 +57,14 @@ async function isToolInstalled(toolName) {
 async function installYamldiff() {
   core.info('Installing yamldiff...')
   await exec.exec('go', ['install', 'github.com/semihbkgr/yamldiff@v0.3.0'])
+
+  const goPathResult = await exec.getExecOutput('go', ['env', 'GOPATH'])
+  if (goPathResult.stdout.trim()) {
+    const goPath = goPathResult.stdout.trim()
+    const goBinPath = path.join(goPath, 'bin')
+    core.addPath(goBinPath)
+    core.info(`Added Go binary path to PATH: ${goBinPath}`)
+  }
 }
 
 /**
