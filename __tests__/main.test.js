@@ -83,7 +83,6 @@ describe('k8s-diff-action', () => {
     ])
   })
 
-
   it('uses custom command when provided', async () => {
     core.getInput.mockImplementation((name) => {
       const inputs = {
