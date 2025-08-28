@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: nginx
   pullPolicy: IfNotPresent
-  tag: "1.21"
+  tag: '1.21'
 
 service:
   type: ClusterIP
