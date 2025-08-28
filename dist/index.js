@@ -34013,7 +34013,10 @@ async function run() {
       baseSha = result.stdout;
     } catch {
       coreExports.info(`Failed to resolve ${baseRef}, trying origin/${baseRef}...`);
-      const result = await execExports.getExecOutput('git', ['rev-parse', `origin/${baseRef}`]);
+      const result = await execExports.getExecOutput('git', [
+        'rev-parse',
+        `origin/${baseRef}`
+      ]);
       baseSha = result.stdout;
     }
 
@@ -34031,7 +34034,10 @@ async function run() {
         headSha = result.stdout;
       } catch {
         coreExports.info(`Failed to resolve ${headRef}, trying origin/${headRef}...`);
-        const result = await execExports.getExecOutput('git', ['rev-parse', `origin/${headRef}`]);
+        const result = await execExports.getExecOutput('git', [
+          'rev-parse',
+          `origin/${headRef}`
+        ]);
         headSha = result.stdout;
       }
 
