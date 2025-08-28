@@ -56,10 +56,7 @@ async function isToolInstalled(toolName) {
  */
 async function installYamldiff() {
   core.info('Installing yamldiff...')
-  await exec.exec('go', [
-    'install',
-    'github.com/semihbkgr/yamldiff@v0.3.0'
-  ])
+  await exec.exec('go', ['install', 'github.com/semihbkgr/yamldiff@v0.3.0'])
 }
 
 /**
@@ -71,12 +68,12 @@ async function installHelm() {
   const version = 'v3.14.0'
   const platform = process.platform === 'darwin' ? 'darwin' : 'linux'
   const arch = process.arch === 'arm64' ? 'arm64' : 'amd64'
-  
+
   const downloadUrl = `https://get.helm.sh/helm-${version}-${platform}-${arch}.tar.gz`
   const downloadPath = await tc.downloadTool(downloadUrl)
   const extractedPath = await tc.extractTar(downloadPath)
   const cachedPath = await tc.cacheDir(extractedPath, 'helm', version)
-  
+
   const helmPath = path.join(cachedPath, `${platform}-${arch}`, 'helm')
   core.addPath(path.dirname(helmPath))
 }
@@ -90,11 +87,11 @@ async function installHelm() {
 async function runCommand(command, workingDir) {
   const args = command.split(' ')
   const cmd = args.shift()
-  
+
   let stdout = ''
   let stderr = ''
   let exitCode = 0
-  
+
   try {
     const result = await exec.getExecOutput(cmd, args, {
       cwd: workingDir,
@@ -107,7 +104,7 @@ async function runCommand(command, workingDir) {
     stderr = error.message
     exitCode = 1
   }
-  
+
   return { stdout, stderr, exitCode }
 }
 
@@ -118,13 +115,13 @@ async function runCommand(command, workingDir) {
  */
 async function collectYamlFiles(directory) {
   const yamlFiles = []
-  
+
   async function findYamlFiles(dir) {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true })
-    
+
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name)
-      
+
       if (entry.isDirectory()) {
         await findYamlFiles(fullPath)
       } else if (entry.isFile() && /\.(yaml|yml)$/i.test(entry.name)) {
@@ -132,15 +129,15 @@ async function collectYamlFiles(directory) {
       }
     }
   }
-  
+
   await findYamlFiles(directory)
-  
+
   let combinedContent = ''
   for (const file of yamlFiles) {
     const content = await fs.promises.readFile(file, 'utf8')
     combinedContent += `---\n${content}\n`
   }
-  
+
   return combinedContent
 }
 
@@ -156,7 +153,7 @@ async function generateManifests(tool, command, workingDir) {
     const content = await collectYamlFiles(workingDir)
     return { content, stderr: '', hasError: false }
   }
-  
+
   const result = await runCommand(command, workingDir)
   return {
     content: result.stdout,
@@ -174,39 +171,39 @@ export async function run() {
   try {
     const tool = core.getInput('tool') || 'yaml'
     const customCommand = core.getInput('command')
-    const baseRef = core.getInput('base-ref') || await getDefaultBranch()
+    const baseRef = core.getInput('base-ref') || (await getDefaultBranch())
     const headRef = core.getInput('head-ref') || process.env.GITHUB_SHA
     const workingDir = core.getInput('working-dir') || './'
-    
+
     const command = customCommand || getDefaultCommand(tool)
-    
+
     core.info(`Tool: ${tool}`)
     core.info(`Command: ${command}`)
     core.info(`Base ref: ${baseRef}`)
     core.info(`Head ref: ${headRef}`)
     core.info(`Working dir: ${workingDir}`)
-    
+
     let allStderr = ''
     let hasError = false
-    
+
     if (tool === 'helm' && !(await isToolInstalled('helm'))) {
       await installHelm()
     }
-    
+
     if (!(await isToolInstalled('yamldiff'))) {
       await installYamldiff()
     }
-    
+
     const baseRepoDir = '/tmp/base-ref-repo'
     const headRepoDir = '/tmp/head-ref-repo'
-    
+
     await io.rmRF(baseRepoDir)
     await io.rmRF(headRepoDir)
-    
+
     core.info(`Cloning base ref ${baseRef}...`)
     await exec.exec('git', ['clone', '.', baseRepoDir])
     await exec.exec('git', ['checkout', baseRef], { cwd: baseRepoDir })
-    
+
     let headWorkingDir
     if (headRef === process.env.GITHUB_SHA) {
       headWorkingDir = process.cwd()
@@ -216,56 +213,58 @@ export async function run() {
       await exec.exec('git', ['checkout', headRef], { cwd: headRepoDir })
       headWorkingDir = headRepoDir
     }
-    
+
     core.info('Generating base manifests...')
     const baseResult = await generateManifests(
       tool,
       command,
       path.join(baseRepoDir, workingDir)
     )
-    
+
     if (baseResult.hasError) {
       allStderr += `Base ref error: ${baseResult.stderr}\n`
       hasError = true
     }
-    
+
     core.info('Generating head manifests...')
     const headResult = await generateManifests(
       tool,
       command,
       path.join(headWorkingDir, workingDir)
     )
-    
+
     if (headResult.hasError) {
       allStderr += `Head ref error: ${headResult.stderr}\n`
       hasError = true
     }
-    
+
     const baseFile = '/tmp/base-ref.yaml'
     const headFile = '/tmp/head-ref.yaml'
-    
+
     await fs.promises.writeFile(baseFile, baseResult.content)
     await fs.promises.writeFile(headFile, headResult.content)
-    
+
     core.info('Running yamldiff...')
-    const diffResult = await runCommand(`yamldiff ${baseFile} ${headFile}`, '/tmp')
-    
+    const diffResult = await runCommand(
+      `yamldiff ${baseFile} ${headFile}`,
+      '/tmp'
+    )
+
     if (diffResult.exitCode !== 0) {
       allStderr += `Yamldiff error: ${diffResult.stderr}\n`
       hasError = true
     }
-    
+
     // Set outputs
     core.setOutput('diff-output', diffResult.stdout)
     core.setOutput('stderr', allStderr)
     core.setOutput('error', hasError.toString())
-    
+
     if (hasError) {
       core.warning('Some commands failed. Check stderr output for details.')
     }
-    
+
     core.info('K8s diff action completed successfully')
-    
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)
