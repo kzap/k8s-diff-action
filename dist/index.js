@@ -34004,6 +34004,9 @@ async function run() {
     await ioExports.rmRF(baseRepoDir);
     await ioExports.rmRF(headRepoDir);
 
+    coreExports.info('Fetching latest refs from origin...');
+    await execExports.exec('git', ['fetch', 'origin']);
+
     const { stdout: baseSha } = await execExports.getExecOutput('git', [
       'rev-parse',
       baseRef

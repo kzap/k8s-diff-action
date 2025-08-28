@@ -200,6 +200,9 @@ export async function run() {
     await io.rmRF(baseRepoDir)
     await io.rmRF(headRepoDir)
 
+    core.info('Fetching latest refs from origin...')
+    await exec.exec('git', ['fetch', 'origin'])
+
     const { stdout: baseSha } = await exec.getExecOutput('git', [
       'rev-parse',
       baseRef
