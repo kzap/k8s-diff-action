@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: { { include "basic-app.fullname" . } }
-  labels: { { - include "basic-app.labels" . | nindent 4 } }
+  name: {{ include "basic-app.fullname" . }}
+  labels: {{- include "basic-app.labels" . | nindent 4 }}
 spec:
-  replicas: { { .Values.replicaCount } }
+  replicas: {{ .Values.replicaCount } }
   selector:
-    matchLabels: { { - include "basic-app.selectorLabels" . | nindent 6 } }
+    matchLabels: {{- include "basic-app.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      labels: { { - include "basic-app.selectorLabels" . | nindent 8 } }
+      labels: {{- include "basic-app.selectorLabels" . | nindent 8 }}
     spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 2000
       containers:
-        - name: { { .Chart.Name } }
+        - name: {{ .Chart.Name }}
           image: '{{ .Values.image.repository }}:{{ .Values.image.tag }}'
-          imagePullPolicy: { { .Values.image.pullPolicy } }
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
               containerPort: 80
@@ -29,4 +29,4 @@ spec:
             capabilities:
               drop:
                 - ALL
-          resources: { { - toYaml .Values.resources | nindent 12 } }
+          resources: {{- toYaml .Values.resources | nindent 12 }}
