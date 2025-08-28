@@ -6,7 +6,7 @@ author: kzap
 
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
-  icon: git-compare
+  icon: file-plus
   color: blue
 
 # Define your inputs here.
