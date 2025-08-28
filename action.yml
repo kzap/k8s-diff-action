@@ -1,23 +1,43 @@
-name: The name of your action here
-description: Provide a description here
-author: Your name or organization here
+name: Kubernetes Manifest Diff Action
+description: Compare Kubernetes manifests between git references using helm, kustomize, or plain YAML
+author: kzap
 
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
-  icon: heart
-  color: red
+  icon: git-compare
+  color: blue
 
 # Define your inputs here.
 inputs:
-  milliseconds:
-    description: Your input description here
-    required: true
-    default: '1000'
+  tool:
+    description: Tool to use for manifest generation (yaml, helm, kustomize)
+    required: false
+    default: 'yaml'
+  command:
+    description: Command to execute for manifest generation (defaults based on tool)
+    required: false
+    default: ''
+  base-ref:
+    description: Base reference for comparison (default: main or repo default branch)
+    required: false
+    default: ''
+  head-ref:
+    description: Head reference for comparison (default: current commit)
+    required: false
+    default: ''
+  working-dir:
+    description: Working directory relative to repo root
+    required: false
+    default: './'
 
 # Define your outputs here.
 outputs:
-  time:
-    description: Your output description here
+  diff-output:
+    description: The YAML diff between base and head manifests
+  stderr:
+    description: Standard error output from failed commands (for debugging)
+  error:
+    description: Boolean indicating if any command failed (true/false)
 
 runs:
   using: node24
