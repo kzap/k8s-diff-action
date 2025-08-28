@@ -1,0 +1,11 @@
+scan:
+  skip-dirs:
+    - tests/
+    - dist/
+  skip-files:
+    - ./claude*
+    - CLAUDE-PLAN.md
+
+scanners:
+  - vuln
+  - secret
