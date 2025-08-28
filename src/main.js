@@ -200,26 +200,26 @@ export async function run() {
     await io.rmRF(baseRepoDir)
     await io.rmRF(headRepoDir)
 
-    core.info(`Cloning base ref ${baseRef}...`)
-    await exec.exec('git', ['clone', '.', baseRepoDir])
-
     const { stdout: baseSha } = await exec.getExecOutput('git', [
       'rev-parse',
       baseRef
     ])
+
+    core.info(`Cloning base ref ${baseRef}...`)
+    await exec.exec('git', ['clone', '.', baseRepoDir])
     await exec.exec('git', ['checkout', baseSha.trim()], { cwd: baseRepoDir })
 
     let headWorkingDir
     if (headRef === process.env.GITHUB_SHA) {
       headWorkingDir = process.cwd()
     } else {
-      core.info(`Cloning head ref ${headRef}...`)
-      await exec.exec('git', ['clone', '.', headRepoDir])
-
       const { stdout: headSha } = await exec.getExecOutput('git', [
         'rev-parse',
         headRef
       ])
+
+      core.info(`Cloning head ref ${headRef}...`)
+      await exec.exec('git', ['clone', '.', headRepoDir])
       await exec.exec('git', ['checkout', headSha.trim()], { cwd: headRepoDir })
       headWorkingDir = headRepoDir
     }

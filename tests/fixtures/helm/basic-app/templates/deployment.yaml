@@ -11,6 +11,10 @@ spec:
     metadata:
       labels: { { - include "basic-app.selectorLabels" . | nindent 8 } }
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
       containers:
         - name: { { .Chart.Name } }
           image: '{{ .Values.image.repository }}:{{ .Values.image.tag }}'
@@ -19,4 +23,10 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           resources: { { - toYaml .Values.resources | nindent 12 } }
