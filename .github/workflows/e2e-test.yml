@@ -22,7 +22,7 @@ jobs:
         with:
           tool: yaml
           working-dir: tests/fixtures/yaml
-          base-ref: main
+          base-ref: ${{ github.ref_name }}
           head-ref: ${{ github.sha }}
 
       - name: Print YAML diff output
@@ -48,7 +48,7 @@ jobs:
         with:
           tool: helm
           working-dir: tests/fixtures/helm/basic-app
-          base-ref: main
+          base-ref: ${{ github.ref_name }}
           head-ref: ${{ github.sha }}
 
       - name: Print Helm diff output
@@ -75,7 +75,7 @@ jobs:
           tool: helm
           command: helm template my-release .
           working-dir: tests/fixtures/helm/basic-app
-          base-ref: main
+          base-ref: ${{ github.ref_name }}
           head-ref: ${{ github.sha }}
 
       - name: Print custom command diff output

@@ -1,62 +1,123 @@
 /**
  * Unit tests for the action's main functionality, src/main.js
- *
- * To mock dependencies in ESM, you can create fixtures that export mock
- * functions and objects. For example, the core module is mocked in this test,
- * so that the actual '@actions/core' module is not imported.
  */
 import { jest } from '@jest/globals'
 import * as core from '../__fixtures__/core.js'
-import { wait } from '../__fixtures__/wait.js'
+import * as exec from '../__fixtures__/exec.js'
+import * as io from '../__fixtures__/io.js'
+import * as tc from '../__fixtures__/tool-cache.js'
+import * as github from '../__fixtures__/github.js'
+import * as fs from '../__fixtures__/fs.js'
 
-// Mocks should be declared before the module being tested is imported.
 jest.unstable_mockModule('@actions/core', () => core)
-jest.unstable_mockModule('../src/wait.js', () => ({ wait }))
+jest.unstable_mockModule('@actions/exec', () => exec)
+jest.unstable_mockModule('@actions/io', () => io)
+jest.unstable_mockModule('@actions/tool-cache', () => tc)
+jest.unstable_mockModule('@actions/github', () => github)
+jest.unstable_mockModule('fs', () => fs)
 
-// The module being tested should be imported dynamically. This ensures that the
-// mocks are used in place of any actual dependencies.
 const { run } = await import('../src/main.js')
 
-describe('main.js', () => {
+describe('k8s-diff-action', () => {
   beforeEach(() => {
-    // Set the action's inputs as return values from core.getInput().
-    core.getInput.mockImplementation(() => '500')
-
-    // Mock the wait function so that it does not actually wait.
-    wait.mockImplementation(() => Promise.resolve('done!'))
-  })
-
-  afterEach(() => {
     jest.resetAllMocks()
+
+    core.getInput.mockImplementation((name) => {
+      const inputs = {
+        tool: 'yaml',
+        command: '',
+        'base-ref': 'main',
+        'head-ref': 'HEAD',
+        'working-dir': './'
+      }
+      return inputs[name] || ''
+    })
+
+    exec.exec.mockResolvedValue(0)
+
+    exec.getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stdout: 'mock yaml output',
+      stderr: ''
+    })
+
+    io.rmRF.mockResolvedValue()
+
+    fs.promises.readdir.mockResolvedValue([
+      { name: 'test.yaml', isFile: () => true, isDirectory: () => false }
+    ])
+    fs.promises.readFile.mockResolvedValue('mock yaml content')
+    fs.promises.writeFile.mockResolvedValue()
+
+    process.env.GITHUB_SHA = 'mock-sha'
   })
 
-  it('Sets the time output', async () => {
+  it('processes yaml tool with default settings', async () => {
     await run()
 
-    // Verify the time output was set.
-    expect(core.setOutput).toHaveBeenNthCalledWith(
-      1,
-      'time',
-      // Simple regex to match a time string in the format HH:MM:SS.
-      expect.stringMatching(/^\d{2}:\d{2}:\d{2}/)
+    expect(core.setOutput).toHaveBeenCalledWith(
+      'diff-output',
+      expect.any(String)
     )
+    expect(core.setOutput).toHaveBeenCalledWith('error', 'false')
   })
 
-  it('Sets a failed status', async () => {
-    // Clear the getInput mock and return an invalid value.
-    core.getInput.mockClear().mockReturnValueOnce('this is not a number')
-
-    // Clear the wait mock and return a rejected promise.
-    wait
-      .mockClear()
-      .mockRejectedValueOnce(new Error('milliseconds is not a number'))
+  it('handles command execution errors', async () => {
+    exec.exec.mockRejectedValue(new Error('Git command failed'))
 
     await run()
 
-    // Verify that the action was marked as failed.
-    expect(core.setFailed).toHaveBeenNthCalledWith(
-      1,
-      'milliseconds is not a number'
+    expect(core.setFailed).toHaveBeenCalledWith('Git command failed')
+  })
+
+  it('installs yamldiff when not found', async () => {
+    exec.exec
+      .mockRejectedValueOnce(new Error('yamldiff not found'))
+      .mockResolvedValue(0)
+
+    await run()
+
+    expect(exec.exec).toHaveBeenCalledWith('go', [
+      'install',
+      'github.com/semihbkgr/yamldiff@v0.3.0'
+    ])
+  })
+
+  it('sets error output when yamldiff fails', async () => {
+    // For yaml tool, only yamldiff command uses getExecOutput
+    exec.getExecOutput.mockResolvedValueOnce({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'yamldiff error'
+    })
+
+    await run()
+
+    expect(core.setOutput).toHaveBeenCalledWith(
+      'stderr',
+      expect.stringContaining('Yamldiff error: yamldiff error')
+    )
+    expect(core.setOutput).toHaveBeenCalledWith('error', 'true')
+  })
+
+  it('uses custom command when provided', async () => {
+    core.getInput.mockImplementation((name) => {
+      const inputs = {
+        tool: 'helm',
+        command: 'helm template my-release .',
+        'base-ref': 'main',
+        'head-ref': 'HEAD',
+        'working-dir': './'
+      }
+      return inputs[name] || ''
+    })
+
+    await run()
+
+    expect(exec.getExecOutput).toHaveBeenCalledWith(
+      'helm',
+      ['template', 'my-release', '.'],
+      expect.any(Object)
     )
   })
 })
