@@ -34006,7 +34006,9 @@ async function run() {
 
     coreExports.info(`Cloning base ref ${baseRef}...`);
     await execExports.exec('git', ['clone', '.', baseRepoDir]);
-    await execExports.exec('git', ['checkout', baseRef], { cwd: baseRepoDir });
+    
+    const { stdout: baseSha } = await execExports.getExecOutput('git', ['rev-parse', baseRef]);
+    await execExports.exec('git', ['checkout', baseSha.trim()], { cwd: baseRepoDir });
 
     let headWorkingDir;
     if (headRef === process.env.GITHUB_SHA) {
@@ -34014,7 +34016,9 @@ async function run() {
     } else {
       coreExports.info(`Cloning head ref ${headRef}...`);
       await execExports.exec('git', ['clone', '.', headRepoDir]);
-      await execExports.exec('git', ['checkout', headRef], { cwd: headRepoDir });
+      
+      const { stdout: headSha } = await execExports.getExecOutput('git', ['rev-parse', headRef]);
+      await execExports.exec('git', ['checkout', headSha.trim()], { cwd: headRepoDir });
       headWorkingDir = headRepoDir;
     }
 

@@ -84,12 +84,17 @@ describe('k8s-diff-action', () => {
   })
 
   it('sets error output when yamldiff fails', async () => {
-    // For yaml tool, only yamldiff command uses getExecOutput
-    exec.getExecOutput.mockResolvedValueOnce({
-      exitCode: 1,
-      stdout: '',
-      stderr: 'yamldiff error'
-    })
+    exec.getExecOutput
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: 'mock-base-sha',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: '',
+        stderr: 'yamldiff error'
+      })
 
     await run()
 
