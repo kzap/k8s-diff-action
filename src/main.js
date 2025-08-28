@@ -203,10 +203,18 @@ export async function run() {
     core.info('Fetching latest refs from origin...')
     await exec.exec('git', ['fetch', 'origin'])
 
-    const { stdout: baseSha } = await exec.getExecOutput('git', [
-      'rev-parse',
-      baseRef
-    ])
+    let baseSha
+    try {
+      const result = await exec.getExecOutput('git', ['rev-parse', baseRef])
+      baseSha = result.stdout
+    } catch {
+      core.info(`Failed to resolve ${baseRef}, trying origin/${baseRef}...`)
+      const result = await exec.getExecOutput('git', [
+        'rev-parse',
+        `origin/${baseRef}`
+      ])
+      baseSha = result.stdout
+    }
 
     core.info(`Cloning base ref ${baseRef}...`)
     await exec.exec('git', ['clone', '.', baseRepoDir])
@@ -216,10 +224,18 @@ export async function run() {
     if (headRef === process.env.GITHUB_SHA) {
       headWorkingDir = process.cwd()
     } else {
-      const { stdout: headSha } = await exec.getExecOutput('git', [
-        'rev-parse',
-        headRef
-      ])
+      let headSha
+      try {
+        const result = await exec.getExecOutput('git', ['rev-parse', headRef])
+        headSha = result.stdout
+      } catch {
+        core.info(`Failed to resolve ${headRef}, trying origin/${headRef}...`)
+        const result = await exec.getExecOutput('git', [
+          'rev-parse',
+          `origin/${headRef}`
+        ])
+        headSha = result.stdout
+      }
 
       core.info(`Cloning head ref ${headRef}...`)
       await exec.exec('git', ['clone', '.', headRepoDir])

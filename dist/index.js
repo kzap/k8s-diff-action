@@ -34007,10 +34007,15 @@ async function run() {
     coreExports.info('Fetching latest refs from origin...');
     await execExports.exec('git', ['fetch', 'origin']);
 
-    const { stdout: baseSha } = await execExports.getExecOutput('git', [
-      'rev-parse',
-      baseRef
-    ]);
+    let baseSha;
+    try {
+      const result = await execExports.getExecOutput('git', ['rev-parse', baseRef]);
+      baseSha = result.stdout;
+    } catch {
+      coreExports.info(`Failed to resolve ${baseRef}, trying origin/${baseRef}...`);
+      const result = await execExports.getExecOutput('git', ['rev-parse', `origin/${baseRef}`]);
+      baseSha = result.stdout;
+    }
 
     coreExports.info(`Cloning base ref ${baseRef}...`);
     await execExports.exec('git', ['clone', '.', baseRepoDir]);
@@ -34020,10 +34025,15 @@ async function run() {
     if (headRef === process.env.GITHUB_SHA) {
       headWorkingDir = process.cwd();
     } else {
-      const { stdout: headSha } = await execExports.getExecOutput('git', [
-        'rev-parse',
-        headRef
-      ]);
+      let headSha;
+      try {
+        const result = await execExports.getExecOutput('git', ['rev-parse', headRef]);
+        headSha = result.stdout;
+      } catch {
+        coreExports.info(`Failed to resolve ${headRef}, trying origin/${headRef}...`);
+        const result = await execExports.getExecOutput('git', ['rev-parse', `origin/${headRef}`]);
+        headSha = result.stdout;
+      }
 
       coreExports.info(`Cloning head ref ${headRef}...`);
       await execExports.exec('git', ['clone', '.', headRepoDir]);
