@@ -1,0 +1,5 @@
+skip-path:
+  - tests/
+  - ./claude*
+  - CLAUDE-PLAN.md
+  - dist/
