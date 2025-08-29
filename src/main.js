@@ -187,7 +187,7 @@ export async function run() {
     // if headRef is undefined, use git to get current HEAD
     let result
     result = await exec.getExecOutput('git', ['rev-parse', 'HEAD'])
-    const currentHeadSha = result.stdout
+    const currentHeadSha = result.stdout.trim()
     const headRef = core.getInput('head-ref') || process.env.GITHUB_SHA || currentHeadSha
 
     core.info(`Tool: ${tool}`)
