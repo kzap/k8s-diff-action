@@ -177,7 +177,6 @@ async function generateManifests(tool, command, workingDir) {
  */
 export async function run() {
   try {
-    
     const tool = core.getInput('tool') || 'yaml'
     const customCommand = core.getInput('command')
     const baseRef = core.getInput('base-ref') || (await getDefaultBranch())
@@ -188,7 +187,8 @@ export async function run() {
     let result
     result = await exec.getExecOutput('git', ['rev-parse', 'HEAD'])
     const currentHeadSha = result.stdout.trim()
-    const headRef = core.getInput('head-ref') || process.env.GITHUB_SHA || currentHeadSha
+    const headRef =
+      core.getInput('head-ref') || process.env.GITHUB_SHA || currentHeadSha
 
     core.info(`Tool: ${tool}`)
     core.info(`Command: ${command}`)
@@ -244,7 +244,6 @@ export async function run() {
 
     const baseFile = '/tmp/base-ref.yaml'
     await fs.promises.writeFile(baseFile, baseResult.content)
-    
 
     // Generate YAML from Head Ref
     const headRepoDir = '/tmp/head-ref-repo'
@@ -265,7 +264,7 @@ export async function run() {
     core.info(`Cloning head ref ${headRef}...`)
     await exec.exec('git', ['clone', '.', headRepoDir])
     await exec.exec('git', ['checkout', headSha.trim()], { cwd: headRepoDir })
-    
+
     core.info('Generating head manifests...')
     const headResult = await generateManifests(
       tool,
@@ -277,7 +276,7 @@ export async function run() {
       allStderr += `Head ref error: ${headResult.stderr}\n`
       hasError = true
     }
-    
+
     const headFile = '/tmp/head-ref.yaml'
     await fs.promises.writeFile(headFile, headResult.content)
 
