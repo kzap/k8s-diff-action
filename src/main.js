@@ -180,10 +180,15 @@ export async function run() {
     const tool = core.getInput('tool') || 'yaml'
     const customCommand = core.getInput('command')
     const baseRef = core.getInput('base-ref') || (await getDefaultBranch())
-    const headRef = core.getInput('head-ref') || process.env.GITHUB_SHA
     const workingDir = core.getInput('working-dir') || './'
-
     const command = customCommand || getDefaultCommand(tool)
+
+    // if headRef is undefined, use git to get current HEAD
+    let result
+    result = await exec.getExecOutput('git', ['rev-parse', 'HEAD'])
+    const currentHeadSha = result.stdout.trim()
+    const headRef =
+      core.getInput('head-ref') || process.env.GITHUB_SHA || currentHeadSha
 
     core.info(`Tool: ${tool}`)
     core.info(`Command: ${command}`)
@@ -202,15 +207,12 @@ export async function run() {
       await installYamldiff()
     }
 
-    const baseRepoDir = '/tmp/base-ref-repo'
-    const headRepoDir = '/tmp/head-ref-repo'
-
-    await io.rmRF(baseRepoDir)
-    await io.rmRF(headRepoDir)
-
     core.info('Fetching latest refs from origin...')
     await exec.exec('git', ['fetch', 'origin'])
 
+    // Generate YAML from Base Ref
+    const baseRepoDir = '/tmp/base-ref-repo'
+    await io.rmRF(baseRepoDir)
     let baseSha
     try {
       const result = await exec.getExecOutput('git', ['rev-parse', baseRef])
@@ -228,46 +230,57 @@ export async function run() {
     await exec.exec('git', ['clone', '.', baseRepoDir])
     await exec.exec('git', ['checkout', baseSha.trim()], { cwd: baseRepoDir })
 
-    let headWorkingDir
-    if (headRef === process.env.GITHUB_SHA) {
-      headWorkingDir = process.cwd()
-    } else {
-      let headSha
-      try {
-        const result = await exec.getExecOutput('git', ['rev-parse', headRef])
-        headSha = result.stdout
-      } catch {
-        core.info(`Failed to resolve ${headRef}, trying origin/${headRef}...`)
-        const result = await exec.getExecOutput('git', [
-          'rev-parse',
-          `origin/${headRef}`
-        ])
-        headSha = result.stdout
-      }
-
-      core.info(`Cloning head ref ${headRef}...`)
-      await exec.exec('git', ['clone', '.', headRepoDir])
-      await exec.exec('git', ['checkout', headSha.trim()], { cwd: headRepoDir })
-      headWorkingDir = headRepoDir
-    }
-
     core.info('Generating base manifests...')
-    const baseResult = await generateManifests(
-      tool,
-      command,
-      path.join(baseRepoDir, workingDir)
-    )
+    let baseResult
+    // if dir does not exist or is empty, assume base is empty
+    if (!fs.existsSync(path.join(baseRepoDir, workingDir)) || fs.readdirSync(path.join(baseRepoDir, workingDir)).length === 0) {
+      core.info('Base ref is empty, assuming empty YAML')
+      baseResult = {
+        content: '',
+        stderr: '',
+        hasError: false
+      }
+    } else {
+      baseResult = await generateManifests(
+        tool,
+        command,
+        path.join(baseRepoDir, workingDir)
+      )
+    }
 
     if (baseResult.hasError) {
       allStderr += `Base ref error: ${baseResult.stderr}\n`
       hasError = true
     }
 
+    const baseFile = '/tmp/base-ref.yaml'
+    await fs.promises.writeFile(baseFile, baseResult.content)
+
+    // Generate YAML from Head Ref
+    const headRepoDir = '/tmp/head-ref-repo'
+    await io.rmRF(headRepoDir)
+    let headSha
+    try {
+      const result = await exec.getExecOutput('git', ['rev-parse', headRef])
+      headSha = result.stdout
+    } catch {
+      core.info(`Failed to resolve ${headRef}, trying origin/${headRef}...`)
+      const result = await exec.getExecOutput('git', [
+        'rev-parse',
+        `origin/${headRef}`
+      ])
+      headSha = result.stdout
+    }
+
+    core.info(`Cloning head ref ${headRef}...`)
+    await exec.exec('git', ['clone', '.', headRepoDir])
+    await exec.exec('git', ['checkout', headSha.trim()], { cwd: headRepoDir })
+
     core.info('Generating head manifests...')
     const headResult = await generateManifests(
       tool,
       command,
-      path.join(headWorkingDir, workingDir)
+      path.join(headRepoDir, workingDir)
     )
 
     if (headResult.hasError) {
@@ -275,12 +288,10 @@ export async function run() {
       hasError = true
     }
 
-    const baseFile = '/tmp/base-ref.yaml'
     const headFile = '/tmp/head-ref.yaml'
-
-    await fs.promises.writeFile(baseFile, baseResult.content)
     await fs.promises.writeFile(headFile, headResult.content)
 
+    // diff both YAMLs
     core.info('Running yamldiff...')
     const diffResult = await runCommand(
       `yamldiff ${baseFile} ${headFile}`,
