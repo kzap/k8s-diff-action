@@ -231,11 +231,22 @@ export async function run() {
     await exec.exec('git', ['checkout', baseSha.trim()], { cwd: baseRepoDir })
 
     core.info('Generating base manifests...')
-    const baseResult = await generateManifests(
-      tool,
-      command,
-      path.join(baseRepoDir, workingDir)
-    )
+    let baseResult
+    // if dir does not exist or is empty, assume base is empty
+    if (!fs.existsSync(path.join(baseRepoDir, workingDir)) || fs.readdirSync(path.join(baseRepoDir, workingDir)).length === 0) {
+      core.info('Base ref is empty, assuming empty YAML')
+      baseResult = {
+        content: '',
+        stderr: '',
+        hasError: false
+      }
+    } else {
+      baseResult = await generateManifests(
+        tool,
+        command,
+        path.join(baseRepoDir, workingDir)
+      )
+    }
 
     if (baseResult.hasError) {
       allStderr += `Base ref error: ${baseResult.stderr}\n`
