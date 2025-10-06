@@ -1,6 +1,7 @@
 import * as core from '@actions/core'
 import * as exec from '@actions/exec'
 import * as io from '@actions/io'
+import * as github from '@actions/github'
 import * as fs from 'fs'
 import * as path from 'path'
 import { getDefaultCommand, getDefaultPrepareCommands } from './config.js'
@@ -18,13 +19,41 @@ export async function run() {
   try {
     const tool = core.getInput('tool') || 'yaml'
     const customCommand = core.getInput('command')
-    const baseRef = core.getInput('base-ref') || (await getDefaultBranch())
     const workingDir = core.getInput('working-dir') || './'
     const headWorkingDir = core.getInput('head-working-dir') || workingDir
     const customPrepareCommands = core.getInput('prepare-commands')
     const command = customCommand || getDefaultCommand(tool)
     const prepareCommands =
       customPrepareCommands || getDefaultPrepareCommands(tool)
+    let errorMsg = ''
+
+    // if baseRef is undefined, use git to get default branch
+    let baseRef = core.getInput('base-ref') || ''
+    if (!baseRef && github.context.payload) {
+      // Accessing the event payload
+      const payload = github.context.payload
+      core.info(`The event payload: ${JSON.stringify(payload, null, 2)}`)
+      baseRef = payload.ref
+    }
+    // if baseRef is still undefined, use git to get default branch
+    if (!baseRef) {
+      let defaultBranch = await getDefaultBranch()
+      core.info(`Default branch: ${defaultBranch}`)
+      baseRef = defaultBranch
+    }
+
+    // get the sha of the base ref
+    let baseSha
+    try {
+      // exec git fetch origin ${baseRef}
+      await exec.exec('git', ['fetch', 'origin', baseRef])
+      const result = await exec.getExecOutput('git', ['rev-parse', baseRef])
+      baseSha = result.stdout
+    } catch {
+      errorMsg = `Failed to fetch origin ${baseRef}`
+      core.error(errorMsg)
+      throw new Error(errorMsg)
+    }
 
     // if headRef is undefined, use git to get current HEAD
     let result
@@ -32,11 +61,25 @@ export async function run() {
     const currentHeadSha = result.stdout.trim()
     const headRef =
       core.getInput('head-ref') || process.env.GITHUB_SHA || currentHeadSha
+    // get the sha of the base ref
+    let headSha
+    try {
+      // exec git fetch origin ${headRef}
+      await exec.exec('git', ['fetch', 'origin', headRef])
+      const result = await exec.getExecOutput('git', ['rev-parse', headRef])
+      headSha = result.stdout
+    } catch {
+      errorMsg = `Failed to fetch origin ${headRef}`
+      core.error(errorMsg)
+      throw new Error(errorMsg)
+    }
 
     core.info(`Tool: ${tool}`)
     core.info(`Command: ${command}`)
     core.info(`Base ref: ${baseRef}`)
+    core.info(`Base sha: ${baseSha}`)
     core.info(`Head ref: ${headRef}`)
+    core.info(`Head sha: ${headSha}`)
     core.info(`Working dir: ${workingDir}`)
     core.info(`Head working dir: ${headWorkingDir}`)
     if (prepareCommands) {
@@ -59,18 +102,6 @@ export async function run() {
     // Generate YAML from Base Ref
     const baseRepoDir = '/tmp/base-ref-repo'
     await io.rmRF(baseRepoDir)
-    let baseSha
-    try {
-      const result = await exec.getExecOutput('git', ['rev-parse', baseRef])
-      baseSha = result.stdout
-    } catch {
-      core.info(`Failed to resolve ${baseRef}, trying origin/${baseRef}...`)
-      const result = await exec.getExecOutput('git', [
-        'rev-parse',
-        `origin/${baseRef}`
-      ])
-      baseSha = result.stdout
-    }
 
     core.info(`Cloning base ref ${baseRef}...`)
     await exec.exec('git', ['clone', '.', baseRepoDir])
@@ -109,18 +140,6 @@ export async function run() {
     // Generate YAML from Head Ref
     const headRepoDir = '/tmp/head-ref-repo'
     await io.rmRF(headRepoDir)
-    let headSha
-    try {
-      const result = await exec.getExecOutput('git', ['rev-parse', headRef])
-      headSha = result.stdout
-    } catch {
-      core.info(`Failed to resolve ${headRef}, trying origin/${headRef}...`)
-      const result = await exec.getExecOutput('git', [
-        'rev-parse',
-        `origin/${headRef}`
-      ])
-      headSha = result.stdout
-    }
 
     core.info(`Cloning head ref ${headRef}...`)
     await exec.exec('git', ['clone', '.', headRepoDir])
