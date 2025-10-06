@@ -21,6 +21,20 @@ function getDefaultCommand(tool) {
 }
 
 /**
+ * Get the default prepare commands for a given tool
+ * @param {string} tool - The tool name (yaml, helm, kustomize)
+ * @returns {string} The default prepare commands for the tool (newline-separated)
+ */
+function getDefaultPrepareCommands(tool) {
+  const defaults = {
+    yaml: '',
+    helm: 'helm dependency update',
+    kustomize: ''
+  }
+  return defaults[tool] || ''
+}
+
+/**
  * Get the default branch of the repository
  * @returns {Promise<string>} The default branch name
  */
@@ -150,13 +164,57 @@ async function collectYamlFiles(directory) {
 }
 
 /**
+ * Run prepare commands in the working directory
+ * @param {string} prepareCommands - Newline-separated list of commands to run
+ * @param {string} workingDir - Working directory
+ * @returns {Promise<{stderr: string, hasError: boolean}>}
+ */
+async function runPrepareCommands(prepareCommands, workingDir) {
+  if (!prepareCommands || !prepareCommands.trim()) {
+    return { stderr: '', hasError: false }
+  }
+
+  const commands = prepareCommands
+    .split('\n')
+    .map(cmd => cmd.trim())
+    .filter(cmd => cmd.length > 0)
+
+  let allStderr = ''
+  let hasError = false
+
+  for (const cmd of commands) {
+    core.info(`Running prepare command: ${cmd}`)
+    const result = await runCommand(cmd, workingDir)
+
+    if (result.exitCode !== 0) {
+      allStderr += `Prepare command failed (${cmd}): ${result.stderr}\n`
+      hasError = true
+      break
+    }
+  }
+
+  return { stderr: allStderr, hasError }
+}
+
+/**
  * Generate manifests using the specified tool and command
  * @param {string} tool - Tool to use (yaml, helm, kustomize)
  * @param {string} command - Command to run
  * @param {string} workingDir - Working directory
+ * @param {string} prepareCommands - Commands to run before generating manifests
  * @returns {Promise<{content: string, stderr: string, hasError: boolean}>}
  */
-async function generateManifests(tool, command, workingDir) {
+async function generateManifests(tool, command, workingDir, prepareCommands) {
+  // Run prepare commands first
+  const prepareResult = await runPrepareCommands(prepareCommands, workingDir)
+  if (prepareResult.hasError) {
+    return {
+      content: '',
+      stderr: prepareResult.stderr,
+      hasError: true
+    }
+  }
+
   if (tool === 'yaml' && !command) {
     const content = await collectYamlFiles(workingDir)
     return { content, stderr: '', hasError: false }
@@ -182,7 +240,9 @@ export async function run() {
     const baseRef = core.getInput('base-ref') || (await getDefaultBranch())
     const workingDir = core.getInput('working-dir') || './'
     const headWorkingDir = core.getInput('head-working-dir') || workingDir
+    const customPrepareCommands = core.getInput('prepare-commands')
     const command = customCommand || getDefaultCommand(tool)
+    const prepareCommands = customPrepareCommands || getDefaultPrepareCommands(tool)
 
     // if headRef is undefined, use git to get current HEAD
     let result
@@ -197,6 +257,9 @@ export async function run() {
     core.info(`Head ref: ${headRef}`)
     core.info(`Working dir: ${workingDir}`)
     core.info(`Head working dir: ${headWorkingDir}`)
+    if (prepareCommands) {
+      core.info(`Prepare commands: ${prepareCommands.split('\n').length} command(s)`)
+    }
 
     let allStderr = ''
     let hasError = false
@@ -249,7 +312,8 @@ export async function run() {
       baseResult = await generateManifests(
         tool,
         command,
-        path.join(baseRepoDir, workingDir)
+        path.join(baseRepoDir, workingDir),
+        prepareCommands
       )
     }
 
@@ -285,7 +349,8 @@ export async function run() {
     const headResult = await generateManifests(
       tool,
       command,
-      path.join(headRepoDir, headWorkingDir)
+      path.join(headRepoDir, headWorkingDir),
+      prepareCommands
     )
 
     if (headResult.hasError) {

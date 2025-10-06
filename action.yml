@@ -39,6 +39,13 @@ inputs:
       By default, the working directory for the base and head files is the same.
     required: false
     default: ''
+  prepare-commands:
+    description: |
+      Commands to run before generating manifests (one per line).
+      These commands are executed in the working directory before running the main command.
+      Useful for setup tasks like installing dependencies, updating submodules, etc.
+    required: false
+    default: ''
 
 # Define your outputs here.
 outputs:
