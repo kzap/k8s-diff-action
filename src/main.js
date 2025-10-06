@@ -233,7 +233,10 @@ export async function run() {
     core.info('Generating base manifests...')
     let baseResult
     // if dir does not exist or is empty, assume base is empty
-    if (!fs.existsSync(path.join(baseRepoDir, workingDir)) || fs.readdirSync(path.join(baseRepoDir, workingDir)).length === 0) {
+    if (
+      !fs.existsSync(path.join(baseRepoDir, workingDir)) ||
+      fs.readdirSync(path.join(baseRepoDir, workingDir)).length === 0
+    ) {
       core.info('Base ref is empty, assuming empty YAML')
       baseResult = {
         content: '',
