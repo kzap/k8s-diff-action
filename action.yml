@@ -33,6 +33,12 @@ inputs:
     description: Working directory relative to repo root
     required: false
     default: './'
+  head-working-dir:
+    description: |
+      If the working directory for the files we want to compare is different from the working directory for the base files, specify it here.
+      By default, the working directory for the base and head files is the same.
+    required: false
+    default: ''
 
 # Define your outputs here.
 outputs:
