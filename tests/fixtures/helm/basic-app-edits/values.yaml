@@ -1,0 +1,17 @@
+replicaCount: 35
+
+image:
+  repository: nginx
+  pullPolicy: IfNotPresent
+  tag: '1.99'
+
+service:
+  type: ClusterIP
+  port: 21
+
+ingress:
+  enabled: false
+
+resources:
+  limits:
+    memory: 128Mi
