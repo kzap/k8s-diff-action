@@ -104,6 +104,9 @@ export async function run() {
 
     core.info(`Cloning base ref ${baseRef}...`)
     await exec.exec('git', ['clone', '.', baseRepoDir])
+    await exec.exec('git', ['fetch', 'origin', baseSha.trim()], {
+      cwd: baseRepoDir
+    })
     await exec.exec('git', ['checkout', baseSha.trim()], { cwd: baseRepoDir })
 
     core.info('Generating base manifests...')
@@ -142,6 +145,9 @@ export async function run() {
 
     core.info(`Cloning head ref ${headRef}...`)
     await exec.exec('git', ['clone', '.', headRepoDir])
+    await exec.exec('git', ['fetch', 'origin', headSha.trim()], {
+      cwd: headRepoDir
+    })
     await exec.exec('git', ['checkout', headSha.trim()], { cwd: headRepoDir })
 
     core.info('Generating head manifests...')

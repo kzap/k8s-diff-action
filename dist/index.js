@@ -34131,6 +34131,9 @@ async function run() {
 
     coreExports.info(`Cloning base ref ${baseRef}...`);
     await execExports.exec('git', ['clone', '.', baseRepoDir]);
+    await execExports.exec('git', ['fetch', 'origin', baseSha.trim()], {
+      cwd: baseRepoDir
+    });
     await execExports.exec('git', ['checkout', baseSha.trim()], { cwd: baseRepoDir });
 
     coreExports.info('Generating base manifests...');
@@ -34169,6 +34172,9 @@ async function run() {
 
     coreExports.info(`Cloning head ref ${headRef}...`);
     await execExports.exec('git', ['clone', '.', headRepoDir]);
+    await execExports.exec('git', ['fetch', 'origin', headSha.trim()], {
+      cwd: headRepoDir
+    });
     await execExports.exec('git', ['checkout', headSha.trim()], { cwd: headRepoDir });
 
     coreExports.info('Generating head manifests...');
