@@ -55,7 +55,7 @@ export async function run() {
     if (!(await isToolInstalled('yamldiff'))) {
       await installYamldiff()
     }
-    
+
     // Generate YAML from Base Ref
     const baseRepoDir = '/tmp/base-ref-repo'
     await io.rmRF(baseRepoDir)

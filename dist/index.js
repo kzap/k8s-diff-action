@@ -30096,9 +30096,6 @@ async function run() {
       await installYamldiff();
     }
 
-    coreExports.info('Fetching latest refs from origin...');
-    await execExports.exec('git', ['fetch', 'origin']);
-
     // Generate YAML from Base Ref
     const baseRepoDir = '/tmp/base-ref-repo';
     await ioExports.rmRF(baseRepoDir);
