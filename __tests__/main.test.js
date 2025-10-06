@@ -69,13 +69,20 @@ describe('k8s-diff-action', () => {
 
     await run()
 
-    expect(core.setFailed).toHaveBeenCalledWith('Git command failed')
+    expect(core.setFailed).toHaveBeenCalledWith('Failed to fetch origin main')
   })
 
   it('installs yamldiff when not found', async () => {
-    exec.exec
-      .mockRejectedValueOnce(new Error('yamldiff not found'))
-      .mockResolvedValue(0)
+    exec.exec.mockImplementation((cmd, args, options) => {
+      // Allow git commands to succeed
+      if (cmd === 'git') return Promise.resolve(0)
+      // Make 'which yamldiff' fail (triggers installation)
+      if (cmd === 'which yamldiff')
+        return Promise.reject(new Error('not found'))
+      // Allow 'go install' to succeed
+      if (cmd === 'go') return Promise.resolve(0)
+      return Promise.resolve(0)
+    })
 
     await run()
 
