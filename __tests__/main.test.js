@@ -69,7 +69,9 @@ describe('k8s-diff-action', () => {
 
     await run()
 
-    expect(core.setFailed).toHaveBeenCalledWith('Failed to fetch origin main')
+    expect(core.setFailed).toHaveBeenCalledWith(
+      'Failed to figure out commit for ref: main, please provide input as base-ref'
+    )
   })
 
   it('installs yamldiff when not found', async () => {

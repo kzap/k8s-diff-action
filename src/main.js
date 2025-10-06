@@ -29,11 +29,10 @@ export async function run() {
 
     // if baseRef is undefined, use git to get default branch
     let baseRef = core.getInput('base-ref') || ''
-    if (!baseRef && github.context.payload) {
+    if (!baseRef && github.context.payload.pull_request) {
       // Accessing the event payload
       const payload = github.context.payload
-      core.info(`The event payload: ${JSON.stringify(payload, null, 2)}`)
-      baseRef = payload.ref
+      baseRef = payload.pull_request.base.ref
     }
     // if baseRef is still undefined, use git to get default branch
     if (!baseRef) {
@@ -50,7 +49,7 @@ export async function run() {
       const result = await exec.getExecOutput('git', ['rev-parse', baseRef])
       baseSha = result.stdout
     } catch {
-      errorMsg = `Failed to fetch origin ${baseRef}`
+      errorMsg = `Failed to figure out commit for ref: ${baseRef}, please provide input as base-ref`
       core.error(errorMsg)
       throw new Error(errorMsg)
     }
