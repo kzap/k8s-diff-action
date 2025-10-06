@@ -181,6 +181,7 @@ export async function run() {
     const customCommand = core.getInput('command')
     const baseRef = core.getInput('base-ref') || (await getDefaultBranch())
     const workingDir = core.getInput('working-dir') || './'
+    const headWorkingDir = core.getInput('head-working-dir') || workingDir
     const command = customCommand || getDefaultCommand(tool)
 
     // if headRef is undefined, use git to get current HEAD
@@ -195,6 +196,7 @@ export async function run() {
     core.info(`Base ref: ${baseRef}`)
     core.info(`Head ref: ${headRef}`)
     core.info(`Working dir: ${workingDir}`)
+    core.info(`Head working dir: ${headWorkingDir}`)
 
     let allStderr = ''
     let hasError = false
@@ -283,7 +285,7 @@ export async function run() {
     const headResult = await generateManifests(
       tool,
       command,
-      path.join(headRepoDir, workingDir)
+      path.join(headRepoDir, headWorkingDir)
     )
 
     if (headResult.hasError) {
