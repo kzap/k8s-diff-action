@@ -32,7 +32,7 @@ export async function run() {
     if (!baseRef && github.context.payload.pull_request) {
       // Accessing the event payload
       const payload = github.context.payload
-      baseRef = payload.pull_request.base.ref
+      baseRef = payload.pull_request.base.sha
     }
     // if baseRef is still undefined, use git to get default branch
     if (!baseRef) {
