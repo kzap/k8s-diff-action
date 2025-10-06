@@ -8,3 +8,6 @@ export const promises = {
   readFile: jest.fn(),
   writeFile: jest.fn()
 }
+
+export const existsSync = jest.fn()
+export const readdirSync = jest.fn()

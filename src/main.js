@@ -1,232 +1,13 @@
 import * as core from '@actions/core'
 import * as exec from '@actions/exec'
 import * as io from '@actions/io'
-import * as tc from '@actions/tool-cache'
-import * as github from '@actions/github'
 import * as fs from 'fs'
 import * as path from 'path'
-
-/**
- * Get the default command for a given tool
- * @param {string} tool - The tool name (yaml, helm, kustomize)
- * @returns {string} The default command for the tool
- */
-function getDefaultCommand(tool) {
-  const defaults = {
-    yaml: '',
-    helm: 'helm template .',
-    kustomize: 'kustomize build .'
-  }
-  return defaults[tool] || ''
-}
-
-/**
- * Get the default prepare commands for a given tool
- * @param {string} tool - The tool name (yaml, helm, kustomize)
- * @returns {string} The default prepare commands for the tool (newline-separated)
- */
-function getDefaultPrepareCommands(tool) {
-  const defaults = {
-    yaml: '',
-    helm: 'helm dependency update',
-    kustomize: ''
-  }
-  return defaults[tool] || ''
-}
-
-/**
- * Get the default branch of the repository
- * @returns {Promise<string>} The default branch name
- */
-async function getDefaultBranch() {
-  try {
-    const { stdout } = await exec.getExecOutput('git', [
-      'symbolic-ref',
-      'refs/remotes/origin/HEAD'
-    ])
-    return stdout.trim().replace('refs/remotes/origin/', '')
-  } catch {
-    return 'main'
-  }
-}
-
-/**
- * Check if a tool is installed
- * @param {string} toolName - Name of the tool to check
- * @returns {Promise<boolean>} True if tool is installed
- */
-async function isToolInstalled(toolName) {
-  try {
-    await exec.exec(`which ${toolName}`, [], { silent: true })
-    return true
-  } catch {
-    return false
-  }
-}
-
-/**
- * Install yamldiff tool using go install
- * @returns {Promise<void>}
- */
-async function installYamldiff() {
-  core.info('Installing yamldiff...')
-  await exec.exec('go', ['install', 'github.com/semihbkgr/yamldiff@v0.3.0'])
-
-  const goPathResult = await exec.getExecOutput('go', ['env', 'GOPATH'])
-  if (goPathResult.stdout.trim()) {
-    const goPath = goPathResult.stdout.trim()
-    const goBinPath = path.join(goPath, 'bin')
-    core.addPath(goBinPath)
-    core.info(`Added Go binary path to PATH: ${goBinPath}`)
-  }
-}
-
-/**
- * Install helm tool using tool-cache
- * @returns {Promise<void>}
- */
-async function installHelm() {
-  core.info('Installing helm...')
-  const version = 'v3.14.0'
-  const platform = process.platform === 'darwin' ? 'darwin' : 'linux'
-  const arch = process.arch === 'arm64' ? 'arm64' : 'amd64'
-
-  const downloadUrl = `https://get.helm.sh/helm-${version}-${platform}-${arch}.tar.gz`
-  const downloadPath = await tc.downloadTool(downloadUrl)
-  const extractedPath = await tc.extractTar(downloadPath)
-  const cachedPath = await tc.cacheDir(extractedPath, 'helm', version)
-
-  const helmPath = path.join(cachedPath, `${platform}-${arch}`, 'helm')
-  core.addPath(path.dirname(helmPath))
-}
-
-/**
- * Run a command in a specific directory and capture output
- * @param {string} command - Command to run
- * @param {string} workingDir - Directory to run command in
- * @returns {Promise<{stdout: string, stderr: string, exitCode: number}>}
- */
-async function runCommand(command, workingDir) {
-  const args = command.split(' ')
-  const cmd = args.shift()
-
-  let stdout = ''
-  let stderr = ''
-  let exitCode = 0
-
-  try {
-    const result = await exec.getExecOutput(cmd, args, {
-      cwd: workingDir,
-      ignoreReturnCode: true
-    })
-    stdout = result.stdout
-    stderr = result.stderr
-    exitCode = result.exitCode
-  } catch (error) {
-    stderr = error.message
-    exitCode = 1
-  }
-
-  return { stdout, stderr, exitCode }
-}
-
-/**
- * Collect all YAML files from a directory recursively
- * @param {string} directory - Directory to search
- * @returns {Promise<string>} Combined YAML content
- */
-async function collectYamlFiles(directory) {
-  const yamlFiles = []
-
-  async function findYamlFiles(dir) {
-    const entries = await fs.promises.readdir(dir, { withFileTypes: true })
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name)
-
-      if (entry.isDirectory()) {
-        await findYamlFiles(fullPath)
-      } else if (entry.isFile() && /\.(yaml|yml)$/i.test(entry.name)) {
-        yamlFiles.push(fullPath)
-      }
-    }
-  }
-
-  await findYamlFiles(directory)
-
-  let combinedContent = ''
-  for (const file of yamlFiles) {
-    const content = await fs.promises.readFile(file, 'utf8')
-    combinedContent += `---\n${content}\n`
-  }
-
-  return combinedContent
-}
-
-/**
- * Run prepare commands in the working directory
- * @param {string} prepareCommands - Newline-separated list of commands to run
- * @param {string} workingDir - Working directory
- * @returns {Promise<{stderr: string, hasError: boolean}>}
- */
-async function runPrepareCommands(prepareCommands, workingDir) {
-  if (!prepareCommands || !prepareCommands.trim()) {
-    return { stderr: '', hasError: false }
-  }
-
-  const commands = prepareCommands
-    .split('\n')
-    .map(cmd => cmd.trim())
-    .filter(cmd => cmd.length > 0)
-
-  let allStderr = ''
-  let hasError = false
-
-  for (const cmd of commands) {
-    core.info(`Running prepare command: ${cmd}`)
-    const result = await runCommand(cmd, workingDir)
-
-    if (result.exitCode !== 0) {
-      allStderr += `Prepare command failed (${cmd}): ${result.stderr}\n`
-      hasError = true
-      break
-    }
-  }
-
-  return { stderr: allStderr, hasError }
-}
-
-/**
- * Generate manifests using the specified tool and command
- * @param {string} tool - Tool to use (yaml, helm, kustomize)
- * @param {string} command - Command to run
- * @param {string} workingDir - Working directory
- * @param {string} prepareCommands - Commands to run before generating manifests
- * @returns {Promise<{content: string, stderr: string, hasError: boolean}>}
- */
-async function generateManifests(tool, command, workingDir, prepareCommands) {
-  // Run prepare commands first
-  const prepareResult = await runPrepareCommands(prepareCommands, workingDir)
-  if (prepareResult.hasError) {
-    return {
-      content: '',
-      stderr: prepareResult.stderr,
-      hasError: true
-    }
-  }
-
-  if (tool === 'yaml' && !command) {
-    const content = await collectYamlFiles(workingDir)
-    return { content, stderr: '', hasError: false }
-  }
-
-  const result = await runCommand(command, workingDir)
-  return {
-    content: result.stdout,
-    stderr: result.stderr,
-    hasError: result.exitCode !== 0
-  }
-}
+import { getDefaultCommand, getDefaultPrepareCommands } from './config.js'
+import { getDefaultBranch } from './git.js'
+import { isToolInstalled, installHelm, installYamldiff } from './tools.js'
+import { runCommand } from './commands.js'
+import { generateManifests } from './manifests.js'
 
 /**
  * The main function for the action.
@@ -242,7 +23,8 @@ export async function run() {
     const headWorkingDir = core.getInput('head-working-dir') || workingDir
     const customPrepareCommands = core.getInput('prepare-commands')
     const command = customCommand || getDefaultCommand(tool)
-    const prepareCommands = customPrepareCommands || getDefaultPrepareCommands(tool)
+    const prepareCommands =
+      customPrepareCommands || getDefaultPrepareCommands(tool)
 
     // if headRef is undefined, use git to get current HEAD
     let result
@@ -258,7 +40,9 @@ export async function run() {
     core.info(`Working dir: ${workingDir}`)
     core.info(`Head working dir: ${headWorkingDir}`)
     if (prepareCommands) {
-      core.info(`Prepare commands: ${prepareCommands.split('\n').length} command(s)`)
+      core.info(
+        `Prepare commands: ${prepareCommands.split('\n').length} command(s)`
+      )
     }
 
     let allStderr = ''

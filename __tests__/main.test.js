@@ -48,6 +48,8 @@ describe('k8s-diff-action', () => {
     ])
     fs.promises.readFile.mockResolvedValue('mock yaml content')
     fs.promises.writeFile.mockResolvedValue()
+    fs.existsSync.mockReturnValue(true)
+    fs.readdirSync.mockReturnValue(['test.yaml'])
 
     process.env.GITHUB_SHA = 'mock-sha'
   })
